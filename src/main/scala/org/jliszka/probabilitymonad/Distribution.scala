@@ -1,4 +1,4 @@
-package probability_monad
+package org.jliszka.probabilitymonad
 
 import java.util.concurrent.ThreadLocalRandom
 
@@ -7,26 +7,24 @@ import scala.collection.parallel.immutable.ParSeq
 import scala.math.BigDecimal
 import scala.util.Random
 
-import scala.collection.compat._
-import CompatParColls.Converters._
 
 trait Distribution[A] {
   self =>
-  protected[probability_monad] def get: A
+  protected[probabilitymonad] def get: A
 
   override def toString = "<distribution>"
 
   def map[B](f: A => B): Distribution[B] = new Distribution[B] {
-    override def get = f(self.get)
+    override def get: B = f(self.get)
   }
 
   def flatMap[B](f: A => Distribution[B]): Distribution[B] = new Distribution[B] {
-    override def get = f(self.get).get
+    override def get: B = f(self.get).get
   }
 
   def filter(pred: A => Boolean): Distribution[A] = new Distribution[A] {
     @tailrec
-    override def get = {
+    override def get: A = {
       val s = self.get
       if (pred(s)) s else this.get
     }
@@ -37,7 +35,7 @@ trait Distribution[A] {
   def given(pred: A => Boolean): Distribution[A] = filter(pred)
 
   def until(pred: List[A] => Boolean): Distribution[List[A]] = new Distribution[List[A]] {
-    override def get = {
+    override def get: List[A] = {
       @tailrec
       def helper(sofar: List[A]): List[A] = {
         if (pred(sofar)) sofar
@@ -49,7 +47,7 @@ trait Distribution[A] {
   }
 
   def repeat(n: Int): Distribution[List[A]] = new Distribution[List[A]] {
-    override def get = self.sample(n)
+    override def get: List[A] = self.sample(n)
   }
 
   /**
@@ -76,7 +74,7 @@ trait Distribution[A] {
   }
 
   def markov(pred: A => Boolean)(f: A => Distribution[A]): Distribution[A] = new Distribution[A] {
-    override def get = {
+    override def get: A = {
       @tailrec
       def helper(a: A): A = {
         if (pred(a)) a
@@ -100,8 +98,8 @@ trait Distribution[A] {
 
   def mean(implicit toDouble: A <:< Double): Double = ev
 
-  private def square(x: Double) = x * x
-  private def cube(x: Double) = x * x * x
+  private def square(x: Double): Double = x * x
+  private def cube(x: Double): Double = x * x * x
 
   def variance(implicit toDouble: A <:< Double): Double = {
     val mean = this.mean
@@ -135,39 +133,39 @@ trait Distribution[A] {
   def samplePar(n: Int = N): ParSeq[A] = (0 until N).par.map(i => self.get)
 
   def zip[B](d: Distribution[B]): Distribution[(A, B)] = new Distribution[(A, B)] {
-    override def get = (self.get, d.get)
+    override def get: (A, B) = (self.get, d.get)
   }
 
   def zipWith[B, C](d: Distribution[B])(f: (A, B) => C): Distribution[C] = new Distribution[C] {
-    override def get = f(self.get, d.get)
+    override def get: C = f(self.get, d.get)
   }
 
   def +(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
-    override def get = n.plus(self.get, d.get)
+    override def get: A = n.plus(self.get, d.get)
   }
   def +(x: A)(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
-    override def get = n.plus(self.get, x)
+    override def get: A = n.plus(self.get, x)
   }
   def -(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
-    override def get = n.minus(self.get, d.get)
+    override def get: A = n.minus(self.get, d.get)
   }
   def -(x: A)(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
-    override def get = n.minus(self.get, x)
+    override def get: A = n.minus(self.get, x)
   }
   def *(d: Distribution[A])(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
-    override def get = n.times(self.get, d.get)
+    override def get: A = n.times(self.get, d.get)
   }
   def *(x: A)(implicit n: Numeric[A]): Distribution[A] = new Distribution[A] {
-    override def get = n.times(self.get, x)
+    override def get: A = n.times(self.get, x)
   }
   def /(d: Distribution[A])(implicit toDouble: A <:< Double): Distribution[Double] = new Distribution[Double] {
-    override def get = toDouble(self.get) / toDouble(d.get)
+    override def get: Double = toDouble(self.get) / toDouble(d.get)
   }
   def /(x: A)(implicit toDouble: A <:< Double): Distribution[Double] = new Distribution[Double] {
-    override def get = toDouble(self.get) / toDouble(x)
+    override def get: Double = toDouble(self.get) / toDouble(x)
   }
 
-  def hist(implicit ord: Ordering[A] = null, d: A <:< Double = null) = {
+  def hist(implicit ord: Ordering[A] = null, d: A <:< Double = null): Unit = {
     if (d == null) {
       plotHist(ord)
     } else {
@@ -176,7 +174,11 @@ trait Distribution[A] {
   }
 
   def histData: Map[A, Double] = {
-    this.sample(N).groupBy(x=>x).view.mapValues(_.length.toDouble / N).toMap
+    val result = this.sample(N).groupBy(x=>x).view.map{
+      case (key, values) => key -> values.length.toDouble/N
+    }.toMap
+
+    result
   }
 
   private def plotHist(implicit ord: Ordering[A] = null): Unit = {
@@ -200,7 +202,7 @@ trait Distribution[A] {
   }
 
   def bucketedHist(buckets: Int)(implicit ord: Ordering[A], toDouble: A <:< Double): Unit = {
-    val data = this.sample(N).toList.sorted
+    val data = this.sample(N).sorted
     val min = data.head
     val max = data.last
     val (outerMin, outerMax, width, nbuckets) = findBucketWidth(toDouble(min), toDouble(max), buckets)
@@ -225,7 +227,6 @@ trait Distribution[A] {
     val bucketToProb = data
       .groupBy(toBucket)
       .map({ case (b, vs) => b -> vs.size.toDouble / n })
-      .toMap
     val bucketed = (min to max by width).map(a => a -> bucketToProb.getOrElse(a, 0.0))
     doPlot(bucketed)
   }
@@ -245,8 +246,8 @@ object Distribution extends Distributions(ThreadLocalRandom.current())
 
 class Distributions(private val rand: Random) {
 
-  def always[A](value: A) = new Distribution[A] {
-    override def get = value
+  def always[A](value: A): Distribution[A] = new Distribution[A] {
+    override def get: A = value
   }
 
   /**
@@ -260,24 +261,24 @@ class Distributions(private val rand: Random) {
   def biasedCoin(p: Double): Distribution[Coin] = discrete(H -> p, T -> (1-p))
 
   def d(n: Int): Distribution[Int] = new Distribution[Int] {
-    override def get = rand.nextInt(n) + 1
+    override def get: Int = rand.nextInt(n) + 1
   }
-  def die = d(6)
-  def dice(n: Int) = die.repeat(n)
+  def die: Distribution[Int] = d(6)
+  def dice(n: Int): Distribution[List[Int]] = die.repeat(n)
 
-  def tf(p: Double = 0.5) = discrete(true -> p, false -> (1-p))
+  def tf(p: Double = 0.5): Distribution[Boolean] = discrete(true -> p, false -> (1-p))
 
-  def bernoulli(p: Double = 0.5) = discrete(1 -> p, 0 -> (1-p))
+  def bernoulli(p: Double = 0.5): Distribution[Int] = discrete(1 -> p, 0 -> (1-p))
 
   def discreteUniform[A](values: Iterable[A]): Distribution[A] = new Distribution[A] {
     private val vec = Vector() ++ values
-    override def get = vec(rand.nextInt(vec.length))
+    override def get: A = vec(rand.nextInt(vec.length))
   }
 
   def discrete[A](weightedValues: (A, Double)*): Distribution[A] = new Distribution[A] {
-    val len = weightedValues.size
-    val scale = len / weightedValues.map(_._2).sum
-    val scaled = weightedValues.map{ case (a, p) => (a, p * scale) }.toList
+    val len: Int = weightedValues.size
+    val scale: Double = len / weightedValues.map(_._2).sum
+    val scaled: List[(A, Double)] = weightedValues.map{ case (a, p) => (a, p * scale) }.toList
     val (smaller, bigger) = scaled.partition(_._2 < 1.0)
 
     // The alias method: http://www.keithschwarz.com/darts-dice-coins/
@@ -299,20 +300,20 @@ class Distributions(private val rand: Random) {
           rest
       }
     }
-    val table = Vector() ++ alias(smaller, bigger, Nil)
+    val table: Vector[(A, Double, Option[A])] = Vector() ++ alias(smaller, bigger, Nil)
     private def select(p1: Double, p2: Double, table: Vector[(A, Double, Option[A])]): A = {
       table((p1 * len).toInt) match {
         case (a, _, None) => a
         case (a, p, Some(b)) => if (p2 <= p) a else b
       }
     }
-    override def get = {
+    override def get: A = {
       select(uniform.get, uniform.get, table)
     }
   }
 
   def geometric(p: Double): Distribution[Int] = {
-    tf(p).until(_.headOption == Some(true)).map(_.size - 1)
+    tf(p).until(_.headOption.contains(true)).map(_.size - 1)
   }
 
   def binomial(p: Double, n: Int): Distribution[Int] = {
@@ -336,11 +337,11 @@ class Distributions(private val rand: Random) {
    */
 
   object uniform extends Distribution[Double] {
-    override def get = rand.nextDouble()
+    override def get: Double = rand.nextDouble()
   }
 
   object normal extends Distribution[Double] {
-    override def get = rand.nextGaussian()
+    override def get: Double = rand.nextGaussian()
   }
 
   def chi2(n: Int): Distribution[Double] = {
@@ -430,7 +431,7 @@ class Distributions(private val rand: Random) {
   }
 
   def sequence[T](ds: List[Distribution[T]]): Distribution[List[T]] = new Distribution[List[T]] {
-    override def get = ds.map(_.get)
+    override def get: List[T] = ds.map(_.get)
   }
 
   def dirichlet(alphas: List[Double]): Distribution[List[Double]] = {
@@ -462,7 +463,7 @@ class Distributions(private val rand: Random) {
    */
   def chi2test[A, B](d: Distribution[(A, B)]): Double = {
     val data = d.histData
-    val total = data.map(_._2).sum
+    val total = data.values.sum
     val rowValues = data.map(_._1._1).toSet
     val colValues = data.map(_._1._2).toSet
 

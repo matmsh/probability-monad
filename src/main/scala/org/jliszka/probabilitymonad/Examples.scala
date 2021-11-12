@@ -1,4 +1,4 @@
-package probability_monad
+package org.jliszka.probabilitymonad
 
 object Examples {
   import Distribution._
@@ -16,11 +16,11 @@ object Examples {
       flips <- c.repeat(nflips)
     } yield CoinTrial(haveFairCoin, flips)
   }
-  def runBayesianCoin(heads: Int) = bayesianCoin(heads).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
-  def bayesianCoin2(nflips: Int) = {
+  def runBayesianCoin(heads: Int): Double = bayesianCoin(heads).given(_.flips.forall(_ == H)).pr(_.haveFairCoin)
+  def bayesianCoin2(nflips: Int): Distribution[Boolean] = {
     tf().posterior(p => (if (p) coin else biasedCoin(0.9)).repeat(nflips))(_.forall(_ == H))
   }
-  def runBayesianCoin2 = bayesianCoin2(10).hist
+  def runBayesianCoin2(): Unit = bayesianCoin2(10).hist
 
 
   /**
@@ -40,7 +40,7 @@ object Examples {
   case object Sick extends Patient
   case object Well extends Patient
   def elisa: Distribution[(Patient, Boolean)] = {
-    def test(patient: Patient) = patient match {
+    def test(patient: Patient): Distribution[Boolean] = patient match {
       case Sick => tf(0.997)
       case Well => tf(0.019)
     }
@@ -51,15 +51,15 @@ object Examples {
       r <- test(p)
     } yield (p, r)
   }
-  def runElisa = elisa.given(_._2).pr(_._1 == Sick)
+  def runElisa: Double = elisa.given(_._2).pr(_._1 == Sick)
 
 
   /**
    * If you flip a coin repeatedly, which is more likely to occur first, HTH or HTT?
    */
 
-  def hth = coin.until(_.take(3) == List(H, T, H)).map(_.length)
-  def htt = coin.until(_.take(3) == List(T, T, H)).map(_.length)
+  def hth: Distribution[Int] = coin.until(_.take(3) == List(H, T, H)).map(_.length)
+  def htt: Distribution[Int] = coin.until(_.take(3) == List(T, T, H)).map(_.length)
 
 
   /**
@@ -76,12 +76,12 @@ object Examples {
     } yield Trial(p, flips)
     d.filter(_.flips.count(_ == H) == successes).map(_.p)
   }
-  def runUnknownBiasedCoin = unknownBiasedCoin(uniform, 10, 8).bucketedHist(0, 1, 20)
+  def runUnknownBiasedCoin(): Unit = unknownBiasedCoin(uniform, 10, 8).bucketedHist(0, 1, 20)
 
   def unknownBiasedCoin2(prior: Distribution[Double], nflips: Int, successes: Int): Distribution[Double] = {
     prior.posterior(p => biasedCoin(p).repeat(nflips))(_.count(_ == H) == successes)
   }
-  def runUnknownBiasedCoin2 = unknownBiasedCoin2(uniform, 10, 8).bucketedHist(0, 1, 20)
+  def runUnknownBiasedCoin2(): Unit = unknownBiasedCoin2(uniform, 10, 8).bucketedHist(0, 1, 20)
 
   /**
    * RISK
@@ -120,7 +120,7 @@ object Examples {
       }
     }
   }
-  def runConquest = conquest(20, List(3, 5, 2, 4)).hist
+  def runConquest(): Unit = conquest(20, List(3, 5, 2, 4)).hist
 
 
   /**
@@ -128,10 +128,10 @@ object Examples {
    * is the expected fraction of girls in the population?
    */ 
   
-  sealed abstract class Child
-  case object Boy extends Child
-  case object Girl extends Child
-  def family = {
+  sealed trait Child
+  object Boy extends Child
+  object Girl extends Child
+  def family: Distribution[List[Child]] = {
     discreteUniform(List(Boy, Girl)).until(_ contains Boy)
   }
   def population(families: Int): Distribution[Double] = {
@@ -140,7 +140,7 @@ object Examples {
       girls = children.count(_ == Girl)
     } yield girls.toDouble / children.length
   }
-  def runBoyGirl = population(4).ev
+  def runBoyGirl: Double = population(4).ev
 
 
   /**
@@ -152,7 +152,7 @@ object Examples {
     val incoming = poisson(loadFactor)
     always(0).markov(100)(inLine => incoming.map(in => math.max(0, inLine + in - 1)))
   }
-  def runBank = queue(0.9).map(_.toDouble).ev
+  def runBank: Double = queue(0.9).map(_.toDouble).ev
 
 
   /**
@@ -165,7 +165,7 @@ object Examples {
       d <- die
     } yield (d + runningSum.head) :: runningSum)
   }
-  def runDieSum = dieSum(30).pr(_ contains 30)
+  def runDieSum: Double = dieSum(30).pr(_ contains 30)
 
   /**
    * Random walk: starting at 0 and moving left or right with equal probability,
@@ -177,7 +177,7 @@ object Examples {
       direction <- discreteUniform(List(-1, 1))
     } yield (positions.head + direction) :: positions)
   }
-  def runRandomWalk = randomWalk(10, 1000).map(_.length.toDouble).ev
+  def runRandomWalk: Double = randomWalk(10, 1000).map(_.length.toDouble).ev
 
   /**
    * Pascal's triangle
@@ -190,13 +190,13 @@ object Examples {
       if (moveLeft) (left+1, right) else (left, right+1)
     }}
   }
-  def runPascal = pascal(6).hist
+  def runPascal(): Unit = pascal(6).hist
 
   /**
    * Given a Markov model for the weather, if it is rainy on thursday, what
    * was the likely weather on monday?
    */
-  def weather = {
+  def weather(): Distribution[(Boolean, Boolean)] = {
     def transition(rain: Boolean): Distribution[Boolean] = rain match {
       case true => discrete(true -> 0.5, false -> 0.5)
       case false => discrete(true -> 0.1, false -> 0.9)
@@ -206,23 +206,23 @@ object Examples {
       thursday <- always(monday).markov(3)(transition)
     } yield (monday, thursday)
   }
-  def runWeather = weather.given{ case (monday, thursday) => thursday }.map(_._1)
+  def runWeather(): Distribution[Boolean] = weather().given{ case (monday, thursday) => thursday }.map(_._1)
 
   /**
    * Simpson's Paradox
    */
 
-  sealed abstract class Party
-  case object Democrat extends Party
-  case object Republican extends Party
+  sealed trait Party
+  object Democrat extends Party
+  object Republican extends Party
 
-  sealed abstract class State
-  case object North extends State
-  case object South extends State
+  sealed trait State
+  object North extends State
+  object South extends State
 
   def simpson(): Distribution[(Party, State, Boolean)] = {
 
-    def stateToParty(state: State) = state match {
+    def stateToParty(state: State): Distribution[Party] = state match {
       case North => discrete(Democrat -> 154.0, Republican -> 162.0)
       case South => discrete(Democrat -> 94.0, Republican -> 1.0)
     }
@@ -246,15 +246,15 @@ object Examples {
       vote <- votedFor(party, state)
     } yield (party, state, vote)
   }
-  def runSimpsonDem() = simpson().given(_._1 == Democrat).pr(_._3)
-  def runSimpsonRep() = simpson().given(_._1 == Republican).pr(_._3)
+  def runSimpsonDem(): Double = simpson().given(_._1 == Democrat).pr(_._3)
+  def runSimpsonRep(): Double = simpson().given(_._1 == Republican).pr(_._3)
 
 
   /**
    * Monty Hall problem
    */
 
-  val montyHall = {
+  val montyHall: Distribution[(Int, Int)] = {
     val doors = (1 to 3).toSet
     for {
       prize <- discreteUniform(doors)   // The prize is placed randomly
@@ -263,7 +263,7 @@ object Examples {
       switch <- discreteUniform(doors - choice - opened)  // You switch to the unopened door
     } yield (prize, switch)
   }
-  def runMontyHall = montyHall.pr{ case (prize, switch) => prize == switch }
+  def runMontyHall: Double = montyHall.pr{ case (prize, switch) => prize == switch }
 
 
   /**
@@ -271,38 +271,38 @@ object Examples {
    * What is the probability that both children are girls?
    */ 
 
-  val jones = {
+  val jones: Distribution[List[Child]] = {
     discreteUniform(List(Boy, Girl))
       .repeat(2)
       .filter(_.head == Girl)
   }
-  def runJones = jones.pr(_.forall(_ == Girl)) // 0.5
+  def runJones: Double = jones.pr(_.forall(_ == Girl)) // 0.5
   
   /**
    * Mr. Smith has two children. At least one of them is a boy.
    * What is the probability that both children are boys?
    */
 
-  val smith = {
+  val smith: Distribution[List[Child]] = {
     discreteUniform(List(Boy, Girl))
       .repeat(2)
       .filter(_ contains Boy)
   }
-  def runSmith = smith.pr(_.forall(_ == Boy)) // 0.333
+  def runSmith: Double = smith.pr(_.forall(_ == Boy)) // 0.333
 
   /**
    * Mr. Miller has two children. One of them is a boy born on Tuesday.
    * What is the probability both children are boys?
    */
 
-  val tuesday = {
-    val child = for {
+  val tuesday: Distribution[List[(Child, Int)]] = {
+    val child: Distribution[(Child, Int)] = for {
       sex <- discreteUniform(List(Boy, Girl))
       day <- d(7)
     } yield (sex, day)
     child.repeat(2).filter(_ contains (Boy, 3))
   }
-  def runTuesday = tuesday.pr(_.forall(_._1 == Boy)) // 0.47
+  def runTuesday: Double = tuesday.pr(_.forall(_._1 == Boy)) // 0.47
 
 
   /**
@@ -321,7 +321,7 @@ object Examples {
   case object O extends BloodType
 
   implicit object BloodTypeOrd extends Ordering[BloodType] {
-    override def compare(a: BloodType, b: BloodType) = {
+    override def compare(a: BloodType, b: BloodType): Int = {
       if (a == b) 0
       else {
         (a, b) match {
@@ -367,7 +367,7 @@ object Examples {
   }
 
   case class BloodTrial(lisa: BloodType, homer: BloodType, marge: BloodType, selma: BloodType, jackie: BloodType, harry: BloodType)
-  val bloodType = for {
+  val bloodType: Distribution[BloodTrial] = for {
     gHomer <- bloodPrior
     gHarry <- bloodPrior
     gJackie <- bloodPrior
@@ -382,7 +382,7 @@ object Examples {
     bHarry <- typeFromGene(gHarry)
   } yield BloodTrial(bLisa, bHomer, bMarge, bSelma, bJackie, bHarry)
 
-  def runBloodType = bloodType.filter(_.selma == A).pr(_.lisa == A)
+  def runBloodType: Double = bloodType.filter(_.selma == A).pr(_.lisa == A)
 
   /**
    * Teasing apart correlation and causality.
@@ -422,11 +422,11 @@ object Examples {
   }
 
   case class SmokingTrial(smoker: Boolean, tar: Boolean, cancer: Boolean) {
-    override def toString = {
+    override def toString: String = {
       "smoker=%-5s tar=%-5s cancer=%-5s".format(smoker, tar, cancer)
     }
   }
-  implicit val SmokingTrialOrdering = Ordering.by((t: SmokingTrial) => (t.smoker, t.tar, t.cancer))
+  implicit val SmokingTrialOrdering: Ordering[SmokingTrial] = Ordering.by((t: SmokingTrial) => (t.smoker, t.tar, t.cancer))
 
   /**
    * This encodes the probability distribution of smoking and cancer.
@@ -448,7 +448,7 @@ object Examples {
    *
    * The intuition behind this graphical model is still unclear to me.
    */
-  def doSmoking: Distribution[SmokingTrial] = {
+  def doSmoking(): Distribution[SmokingTrial] = {
     for {
       s1 <- smoker
       s2 <- smoker
@@ -457,10 +457,10 @@ object Examples {
     } yield SmokingTrial(s1, t, c)
   }
 
-  def runSmoking = {
+  def runSmoking(): Unit = {
     println("p(cancer) = " + smoking.pr(_.cancer))
     println("p(cancer|smoking) = " + smoking.pr(_.cancer, _.smoker))
-    println("p(cancer|do(smoking)) = " + doSmoking.pr(_.cancer, _.smoker))
+    println("p(cancer|do(smoking)) = " + doSmoking().pr(_.cancer, _.smoker))
     println()
     println("Since p(cancer|do(smoking)) < p(cancer), smoking actually prevents cancer (according to our made-up numbers)")
     println("even though, naively, p(cancer|smoking) > p(cancer)!")
@@ -469,8 +469,8 @@ object Examples {
 
   // Experimental...
   object Smoking {
-    def hidden = tf(0.3)
-    def smoker(hidden: Boolean) = hidden match {
+    def hidden: Distribution[Boolean] = tf(0.3)
+    def smoker(hidden: Boolean): Distribution[Boolean] = hidden match {
       case true => tf(0.7)
       case false => tf(0.3)
     }
@@ -487,26 +487,26 @@ object Examples {
       }
     }
 
-    val natural = for {
+    val natural: Distribution[SmokingTrial] = for {
       h <- hidden
       s <- smoker(h)
       t <- tar(s)
       c <- cancer(h, t)
     } yield SmokingTrial(s, t, c)
 
-    def doSmoker = for {
+    def doSmoker(): Distribution[Boolean] = for {
       h <- hidden
       s <- smoker(h)
     } yield s
 
-    val controlled = for {
+    val controlled: Distribution[SmokingTrial] = for {
       h <- hidden
-      s <- doSmoker
+      s <- doSmoker()
       t <- tar(s)
       c <- cancer(h, t)
     } yield SmokingTrial(s, t, c)
 
-    val doSmoking = {
+    val doSmoking: Distribution[SmokingTrial] = {
       val model = natural
       def smoker = {
         model.map(_.smoker)
@@ -529,20 +529,20 @@ object Examples {
 
   object Test {
     case class Trial(a: Boolean, b1: Boolean, b2: Boolean, c: Boolean)
-    def hidden = tf(0.3)
-    def A(hidden: Boolean) = hidden match {
+    def hidden: Distribution[Boolean] = tf(0.3)
+    def A(hidden: Boolean): Distribution[Boolean] = hidden match {
       case true => tf(0.7)
       case false => tf(0.3)
     }
-    def B1(a: Boolean) = a match {
+    def B1(a: Boolean): Distribution[Boolean] = a match {
       case true => tf(0.95)
       case false => tf(0.75)
     }
-    def B2(a: Boolean) = a match {
+    def B2(a: Boolean): Distribution[Boolean] = a match {
       case true => tf(0.3)
       case false => tf(0.2)
     }
-    def C(hidden: Boolean, b1: Boolean, b2: Boolean) = (hidden, b1, b2) match {
+    def C(hidden: Boolean, b1: Boolean, b2: Boolean): Distribution[Boolean] = (hidden, b1, b2) match {
       case (true, true, true) => tf(0.8)
       case (true, true, false) => tf(0.9)
       case (true, false, true) => tf(0.6)
@@ -553,7 +553,7 @@ object Examples {
       case (false, false, false) => tf(0.3)
     }
 
-    val natural = for {
+    val natural: Distribution[Trial] = for {
       h <- hidden
       a <- A(h)
       b1 <- B1(a)
@@ -561,12 +561,12 @@ object Examples {
       c <- C(h, b1, b2)
     } yield Trial(a, b1, b2, c)
 
-    val doA = for {
+    val doA: Distribution[Boolean] = for {
       h <- hidden
       a <- A(h)
     } yield a
 
-    val controlled = for {
+    val controlled: Distribution[Trial] = for {
       h <- hidden
       a <- doA
       b1 <- B1(a)
@@ -574,12 +574,12 @@ object Examples {
       c <- C(h, b1, b2)
     } yield Trial(a, b1, b2, c)
 
-    val doTest = {
+    val doTest: Distribution[Trial] = {
       val model = natural
-      def A = model.map(_.a)
-      def B1(a: Boolean) = model.filter(_.a == a).map(_.b1)
-      def B2(a: Boolean) = model.filter(_.a == a).map(_.b2)
-      def C(a: Boolean, b1: Boolean, b2: Boolean) = {
+      def A: Distribution[Boolean] = model.map(_.a)
+      def B1(a: Boolean): Distribution[Boolean] = model.filter(_.a == a).map(_.b1)
+      def B2(a: Boolean): Distribution[Boolean] = model.filter(_.a == a).map(_.b2)
+      def C(a: Boolean, b1: Boolean, b2: Boolean): Distribution[Boolean] = {
         model.filter(_.a == a).filter(_.b1 == b1).filter(_.b2 == b2).map(_.c)
       }
 
@@ -603,25 +603,25 @@ object Examples {
    *
    */
 
-  def X = tf(0.4)
-  def Y = tf(0.6)
-  def Z(x: Boolean, y: Boolean) = (x, y) match {
+  def X: Distribution[Boolean] = tf(0.4)
+  def Y: Distribution[Boolean] = tf(0.6)
+  def Z(x: Boolean, y: Boolean): Distribution[Boolean] = (x, y) match {
     case (true, true) => tf(0.2)
     case (true, false) => tf(0.7)
     case (false, true) => tf(0.5)
     case (false, false) => tf(0.8)
   }
-  def W(z: Boolean) = z match {
+  def W(z: Boolean): Distribution[Boolean] = z match {
     case true => tf(0.3)
     case false => tf(0.9)
   }
-  def Q(y: Boolean) = y match {
+  def Q(y: Boolean): Distribution[Boolean] = y match {
     case true => tf(0.6)
     case false => tf(0.2)
   }
 
   case class Trial(x: Boolean, y: Boolean, z: Boolean, w: Boolean, q: Boolean)
-  def pgm = {
+  def pgm: Distribution[Trial] = {
     for {
       x <- X
       y <- Y
@@ -631,7 +631,7 @@ object Examples {
     } yield Trial(x, y, z, w, q)
   }
 
-  def dep[A, B](p: Distribution[A])(e1: A => B, e2: A => B)(implicit ord: Ordering[B]) = {
+  def dep[A, B](p: Distribution[A])(e1: A => B, e2: A => B)(implicit ord: Ordering[B]): Unit = {
     p.map(t => (e1(t), e2(t)))
      .histData.toList
      .groupBy{ case ((e1, e2), pr) => e1 }
@@ -653,7 +653,7 @@ object Examples {
      println("independent with probability %.2f%%".format(chi2test(p.map(x => (e1(x), e2(x)))) * 100))
   }
 
-  def doPGM: Unit = {
+  def doPGM(): Unit = {
     println()
     println("** X and Y are independent: p(y|x) = ")
     dep(pgm)(_.x, _.y)
@@ -683,7 +683,7 @@ object Examples {
     dep(pgm.filter(_.y == true))(_.z, _.q)
   }
 
-  def centralLimitTheorem1(d: Distribution[Double], samples: Int) = {
+  def centralLimitTheorem1(d: Distribution[Double], samples: Int): Unit = {
     println()
     println("Original distribution:")
     d.bucketedHist(20)
@@ -709,9 +709,9 @@ object Examples {
     println("stdev = s / sqrt(n) = " + stdev / math.sqrt(samples))
   }
 
-  def runCentralLimitTheorem1 = centralLimitTheorem1(uniform, 100)
+  def runCentralLimitTheorem1(): Unit = centralLimitTheorem1(uniform, 100)
 
-  def centralLimitTheorem2(d: Distribution[Boolean], samples: Int) = {
+  def centralLimitTheorem2(d: Distribution[Boolean], samples: Int): Unit = {
     val p = d.pr(x => x)
     println()
     println("p = pr(b = true) = " + p)
@@ -732,9 +732,9 @@ object Examples {
     println("stdev = sqrt(p*(1-p)/n) = " + math.sqrt(p * (1 - p) / samples))
   }
 
-  def runCentralLimitTheorem2 = centralLimitTheorem2(tf(0.2), 100)
+  def runCentralLimitTheorem2(): Unit = centralLimitTheorem2(tf(0.2), 100)
 
-  def centralLimitTheorem3(d1: Distribution[Double], d2: Distribution[Double], samples1: Int, samples2: Int) = {
+  def centralLimitTheorem3(d1: Distribution[Double], d2: Distribution[Double], samples1: Int, samples2: Int): Unit = {
     println()
     println("Original distribution 1:")
     d1.bucketedHist(20)
@@ -780,9 +780,9 @@ object Examples {
     } yield mean2 - mean1
   }
 
-  def runCentralLimitTheorem3 = centralLimitTheorem3(normal, uniform, 100, 200)
+  def runCentralLimitTheorem3(): Unit = centralLimitTheorem3(normal, uniform, 100, 200)
 
-  def runKSTest: Unit = {
+  def runKSTest(): Unit = {
     println("The Kolmogorov-Smirnov test. Values over 1.95 indicate that the distributions are probably different.")
     println()
     println("comparing 2 normal distributions: " + ksTest(normal, normal))

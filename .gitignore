@@ -6,3 +6,5 @@ project/*.jar
 
 /.bsp
 project/**/metals.sbt
+
+.idea/*

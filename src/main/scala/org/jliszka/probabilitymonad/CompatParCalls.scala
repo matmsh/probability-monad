@@ -1,6 +1,6 @@
-package probability_monad
+package org.jliszka.probabilitymonad
 
-object CompatParColls {
+object CompatParCalls {
   val Converters = {
     import Compat._
 
